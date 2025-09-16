@@ -6,31 +6,38 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Eye, ArrowUpDown, ArrowDown, ArrowUp, Search } from 'lucide-react';
-import { dummyTransactions, Transaction } from '@/data/dummyData';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Eye, ArrowUpDown, ArrowDown, ArrowUp, Search, Loader2, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTransactions, TransactionData } from '@/hooks/useTransactions';
+import { Transaction } from '@/data/dummyData'; // Keep for legacy compatibility
 
 export default function Transactions() {
-  const [transactions] = useState<Transaction[]>(dummyTransactions);
+  const { data, loading, error, filters, updateFilters, refetch, goToPage } = useTransactions();
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const transactions = data?.transactions || [];
+  const pagination = data?.pagination;
 
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
+  // Apply local filters (API handles pagination, we handle additional client-side filtering)
+  const filteredTransactions = transactions.filter((transaction: TransactionData) => {
+    const matchesType = typeFilter === 'all' || transaction.type.toLowerCase() === typeFilter.toLowerCase();
+    const matchesStatus = statusFilter === 'all' || transaction.status.toLowerCase() === statusFilter.toLowerCase();
     const matchesSearch = searchQuery === '' ||
-      transaction.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.id.toLowerCase().includes(searchQuery.toLowerCase());
+      transaction.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      transaction.id.toString().includes(searchQuery.toLowerCase());
     return matchesType && matchesStatus && matchesSearch;
   });
 
   const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'Completed':
+    switch (status.toUpperCase()) {
+      case 'COMPLETED':
         return 'default';
-      case 'Pending':
+      case 'PENDING':
         return 'secondary';
-      case 'Failed':
+      case 'FAILED':
+      case 'CANCELLED':
         return 'destructive';
       default:
         return 'default';
@@ -38,11 +45,24 @@ export default function Transactions() {
   };
 
   const getTypeIcon = (type: string) => {
-    return type === 'Deposit' ? (
-      <ArrowDown className="h-4 w-4 text-success" />
-    ) : (
-      <ArrowUp className="h-4 w-4 text-warning" />
-    );
+    switch (type.toUpperCase()) {
+      case 'DEPOSIT':
+      case 'WIN':
+        return <ArrowDown className="h-4 w-4 text-green-500" />;
+      case 'WITHDRAWAL':
+      case 'BET':
+        return <ArrowUp className="h-4 w-4 text-red-500" />;
+      default:
+        return <ArrowUpDown className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const formatTransactionType = (type: string) => {
+    return type.charAt(0) + type.slice(1).toLowerCase();
+  };
+
+  const formatTransactionStatus = (status: string) => {
+    return status.charAt(0) + status.slice(1).toLowerCase();
   };
 
   const formatAmount = (amount: number) => {
@@ -52,7 +72,7 @@ export default function Transactions() {
     }).format(amount);
   };
 
-  const TransactionDetailsModal = ({ transaction }: { transaction: Transaction }) => (
+  const TransactionDetailsModal = ({ transaction }: { transaction: TransactionData }) => (
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>Transaction Details</DialogTitle>
@@ -70,34 +90,51 @@ export default function Transactions() {
             <label className="text-sm font-medium text-muted-foreground">Type</label>
             <div className="flex items-center gap-2">
               {getTypeIcon(transaction.type)}
-              <span className="text-sm">{transaction.type}</span>
+              <span className="text-sm">{formatTransactionType(transaction.type)}</span>
             </div>
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Amount</label>
             <p className="text-sm font-semibold">{formatAmount(transaction.amount)}</p>
+            {transaction.amount_crypto && (
+              <p className="text-xs text-muted-foreground">Crypto: {transaction.amount_crypto}</p>
+            )}
+            {transaction.gems_amount && (
+              <p className="text-xs text-muted-foreground">Gems: {transaction.gems_amount}</p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Status</label>
             <Badge variant={getStatusVariant(transaction.status)} className="text-xs">
-              {transaction.status}
+              {formatTransactionStatus(transaction.status)}
             </Badge>
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">User</label>
-            <p className="text-sm">{transaction.username}</p>
+            <p className="text-sm">{transaction.user.username}</p>
+            <p className="text-xs text-muted-foreground">{transaction.user.email}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Date</label>
-            <p className="text-sm">{new Date(transaction.date).toLocaleString()}</p>
+            <p className="text-sm">{new Date(transaction.createdAt).toLocaleString()}</p>
           </div>
         </div>
-        <div>
-          <label className="text-sm font-medium text-muted-foreground">Wallet Address</label>
-          <p className="text-xs font-mono bg-muted p-2 rounded break-all mt-1">
-            {transaction.wallet}
-          </p>
-        </div>
+        {transaction.wallet_address && (
+          <div>
+            <label className="text-sm font-medium text-muted-foreground">Wallet Address</label>
+            <p className="text-xs font-mono bg-muted p-2 rounded break-all mt-1">
+              {transaction.wallet_address}
+            </p>
+          </div>
+        )}
+        {transaction.transaction_hash && (
+          <div>
+            <label className="text-sm font-medium text-muted-foreground">Transaction Hash</label>
+            <p className="text-xs font-mono bg-muted p-2 rounded break-all mt-1">
+              {transaction.transaction_hash}
+            </p>
+          </div>
+        )}
       </div>
     </DialogContent>
   );
@@ -111,9 +148,46 @@ export default function Transactions() {
             Monitor all platform transactions
           </p>
         </div>
+        <Button
+          variant="outline"
+          onClick={refetch}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mr-2" />
+            <span>Loading transactions...</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refetch}
+              className="ml-2"
+            >
+              Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Search and Filters */}
+      {!loading && (
       <Card>
         <CardHeader>
           <CardTitle>Search & Filters</CardTitle>
@@ -130,8 +204,10 @@ export default function Transactions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Deposit">Deposit</SelectItem>
-                  <SelectItem value="Withdrawal">Withdrawal</SelectItem>
+                  <SelectItem value="deposit">Deposit</SelectItem>
+                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                  <SelectItem value="bet">Bet</SelectItem>
+                  <SelectItem value="win">Win</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -140,9 +216,10 @@ export default function Transactions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Failed">Failed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -160,6 +237,7 @@ export default function Transactions() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Transactions Table */}
       <Card>
@@ -187,20 +265,31 @@ export default function Transactions() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getTypeIcon(transaction.type)}
-                      <span>{transaction.type}</span>
+                      <span>{formatTransactionType(transaction.type)}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{transaction.username}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{transaction.user.username}</p>
+                      <p className="text-xs text-muted-foreground">{transaction.user.email}</p>
+                    </div>
+                  </TableCell>
                   <TableCell className="font-semibold">
                     {formatAmount(transaction.amount)}
+                    {transaction.amount_crypto && (
+                      <p className="text-xs text-muted-foreground">+{transaction.amount_crypto} crypto</p>
+                    )}
+                    {transaction.gems_amount && (
+                      <p className="text-xs text-muted-foreground">+{transaction.gems_amount} gems</p>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusVariant(transaction.status)}>
-                      {transaction.status}
+                      {formatTransactionStatus(transaction.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(transaction.date).toLocaleDateString()}
+                    {new Date(transaction.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <Dialog>

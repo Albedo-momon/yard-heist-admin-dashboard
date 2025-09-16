@@ -1,48 +1,91 @@
-import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Users, TrendingUp, Activity, DollarSign } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { chartData } from '@/data/dummyData';
+import { Users, TrendingUp, Activity, DollarSign, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+// Chart imports removed - will be added back when API provides chart data
+import { useDashboard } from '@/hooks/useDashboard';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Dashboard() {
-  const [timeRange, setTimeRange] = useState('7d');
-  const [datasetType, setDatasetType] = useState('registrations');
+  const { data, loading, error, refetch } = useDashboard();
 
+  // Show loading spinner
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
+            <p className="text-muted-foreground mt-2">
+              Monitor your platform's performance and growth
+            </p>
+          </div>
+        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{error}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refetch}
+              className="ml-4"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Use API data or fallback to default values
   const summaryCards = [
     {
       title: 'Total Users',
-      value: '12,345',
-      change: '+12.5%',
+      value: data?.users?.total?.toLocaleString() || '0',
+      change: data?.users?.growth || '+0%',
       icon: Users,
       trend: 'up',
     },
     {
-      title: 'Total Visits',
-      value: '45,678',
-      change: '+8.2%',
+      title: 'Active Users',
+      value: data?.users?.active?.toLocaleString() || '0',
+      change: data?.users?.growth || '+0%',
       icon: Activity,
       trend: 'up',
     },
     {
-      title: 'Revenue',
-      value: '$98,765',
-      change: '+15.3%',
+      title: 'Transaction Volume',
+      value: data?.transactions?.volume ? `$${data.transactions.volume.toLocaleString()}` : '$0',
+      change: data?.transactions?.growth || '+0%',
       icon: DollarSign,
       trend: 'up',
     },
     {
-      title: 'Growth Rate',
-      value: '23.1%',
-      change: '+2.4%',
+      title: 'Total Games',
+      value: data?.games?.total?.toLocaleString() || '0',
+      change: `${data?.games?.today || 0} today`,
       icon: TrendingUp,
       trend: 'up',
     },
   ];
 
-  const currentData = datasetType === 'registrations' ? chartData.userRegistrations : chartData.urlVisits;
-  const chartTitle = datasetType === 'registrations' ? 'User Registrations' : 'URL Visits';
+  // For now, we'll show a message that charts are coming soon
+  // since the API doesn't provide chart data yet
+  const showCharts = false;
 
   return (
     <div className="space-y-6">
@@ -53,28 +96,14 @@ export default function Dashboard() {
             Monitor your platform's performance and growth
           </p>
         </div>
-        <div className="flex gap-4">
-          <Select value={datasetType} onValueChange={setDatasetType}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select dataset" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="registrations">User Registrations</SelectItem>
-              <SelectItem value="visits">URL Visits</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Time range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1d">Day</SelectItem>
-              <SelectItem value="7d">Week</SelectItem>
-              <SelectItem value="15d">15 Days</SelectItem>
-              <SelectItem value="30d">Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Button
+          variant="outline"
+          onClick={refetch}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -97,84 +126,32 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts Section */}
+      {showCharts ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Charts will be implemented when API provides chart data */}
+        </div>
+      ) : (
         <Card>
           <CardHeader>
-            <CardTitle>{chartTitle} - Line Chart</CardTitle>
+            <CardTitle>Analytics Charts</CardTitle>
             <CardDescription>
-              Showing {chartTitle.toLowerCase()} over the last 7 months
+              Detailed analytics charts will be available soon
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={currentData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis
-                  dataKey="name"
-                  className="text-muted-foreground"
-                  fontSize={12}
-                />
-                <YAxis
-                  className="text-muted-foreground"
-                  fontSize={12}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={datasetType === 'registrations' ? 'users' : 'visits'}
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="flex items-center justify-center h-64 text-center">
+              <div>
+                <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">Charts Coming Soon</h3>
+                <p className="text-muted-foreground">
+                  Advanced analytics and trend charts will be available in the next update.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{chartTitle} - Bar Chart</CardTitle>
-            <CardDescription>
-              Monthly comparison of {chartTitle.toLowerCase()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={currentData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis
-                  dataKey="name"
-                  className="text-muted-foreground"
-                  fontSize={12}
-                />
-                <YAxis
-                  className="text-muted-foreground"
-                  fontSize={12}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar
-                  dataKey={datasetType === 'registrations' ? 'users' : 'visits'}
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

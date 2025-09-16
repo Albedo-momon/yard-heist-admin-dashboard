@@ -11,6 +11,7 @@ export interface User {
   userType: 'admin' | 'user' | 'both';
 }
 
+// Legacy Transaction interface for dummy data compatibility
 export interface Transaction {
   id: string;
   type: 'Deposit' | 'Withdrawal';
@@ -20,6 +21,26 @@ export interface Transaction {
   wallet: string;
   userId: string;
   username: string;
+}
+
+// New Transaction interface matching backend API
+export interface ApiTransaction {
+  id: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'BET' | 'WIN';
+  amount: number;
+  amount_crypto?: number;
+  gems_amount?: number;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+  user_id: number;
+  wallet_address?: string;
+  transaction_hash?: string;
+  user: {
+    id: number;
+    email: string;
+    username: string;
+  };
 }
 
 export interface WithdrawalRequest {

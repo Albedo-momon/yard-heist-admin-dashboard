@@ -9,11 +9,19 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Shield } from 'lucide-react';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -22,9 +30,9 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+ 
     try {
-      const success = await login(username, password);
+      const success = await login(email, password);
       if (success) {
         toast({
           title: 'Login successful',
@@ -38,9 +46,10 @@ export default function Login() {
         });
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred.',
+        description: 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -63,13 +72,13 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Enter username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
@@ -94,7 +103,7 @@ export default function Login() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-4">
-            Demo: Use any username and password to login
+            Use your admin credentials to login
           </p>
         </CardContent>
       </Card>
