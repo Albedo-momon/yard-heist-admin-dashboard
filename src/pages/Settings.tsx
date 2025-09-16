@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Save, User, Lock, Bell, Shield } from 'lucide-react';
+import { authAPI } from '@/services/api';
+import { Save, User, Lock, Bell, Shield, Loader2 } from 'lucide-react';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -28,6 +29,16 @@ export default function Settings() {
     confirmPassword: '',
   });
 
+  // Loading states
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Validation errors
+  const [passwordErrors, setPasswordErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
   // Notification settings
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
@@ -43,25 +54,89 @@ export default function Settings() {
     });
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: 'Password Mismatch',
-        description: 'New password and confirm password do not match.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    toast({
-      title: 'Password Changed',
-      description: 'Your password has been changed successfully.',
-    });
-    setPasswordData({
+  // Validate password form
+  const validatePasswordForm = () => {
+    const errors = {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
-    });
+    };
+
+    // Check if all fields are filled
+    if (!passwordData.currentPassword.trim()) {
+      errors.currentPassword = 'Current password is required';
+    }
+
+    if (!passwordData.newPassword.trim()) {
+      errors.newPassword = 'New password is required';
+    } else if (passwordData.newPassword.length < 6) {
+      errors.newPassword = 'New password must be at least 6 characters long';
+    }
+
+    if (!passwordData.confirmPassword.trim()) {
+      errors.confirmPassword = 'Please confirm your new password';
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    setPasswordErrors(errors);
+    return !Object.values(errors).some(error => error !== '');
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!validatePasswordForm()) {
+      return;
+    }
+
+    setIsChangingPassword(true);
+    
+    try {
+      await authAPI.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmNewPassword: passwordData.confirmPassword,
+      });
+      
+      toast({
+        title: 'Password Changed',
+        description: 'Your password has been changed successfully.',
+      });
+      
+      // Clear form
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      setPasswordErrors({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      
+      // Handle specific API errors
+      if (error.response?.data?.message) {
+        toast({
+          title: 'Password Change Failed',
+          description: error.response.data.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Password Change Failed',
+          description: 'An error occurred while changing your password. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const handleNotificationSubmit = (e: React.FormEvent) => {
@@ -162,35 +237,75 @@ export default function Settings() {
           <CardContent>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
+                <Label htmlFor="currentPassword">Current Password *</Label>
                 <Input
                   id="currentPassword"
                   type="password"
                   value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, currentPassword: e.target.value });
+                    if (passwordErrors.currentPassword) {
+                      setPasswordErrors({ ...passwordErrors, currentPassword: '' });
+                    }
+                  }}
+                  className={passwordErrors.currentPassword ? 'border-red-500' : ''}
+                  disabled={isChangingPassword}
                 />
+                {passwordErrors.currentPassword && (
+                  <p className="text-sm text-red-500">{passwordErrors.currentPassword}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
+                <Label htmlFor="newPassword">New Password *</Label>
                 <Input
                   id="newPassword"
                   type="password"
                   value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, newPassword: e.target.value });
+                    if (passwordErrors.newPassword) {
+                      setPasswordErrors({ ...passwordErrors, newPassword: '' });
+                    }
+                  }}
+                  className={passwordErrors.newPassword ? 'border-red-500' : ''}
+                  disabled={isChangingPassword}
                 />
+                {passwordErrors.newPassword && (
+                  <p className="text-sm text-red-500">{passwordErrors.newPassword}</p>
+                )}
+                <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Label htmlFor="confirmPassword">Confirm New Password *</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
                   value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  onChange={(e) => {
+                    setPasswordData({ ...passwordData, confirmPassword: e.target.value });
+                    if (passwordErrors.confirmPassword) {
+                      setPasswordErrors({ ...passwordErrors, confirmPassword: '' });
+                    }
+                  }}
+                  className={passwordErrors.confirmPassword ? 'border-red-500' : ''}
+                  disabled={isChangingPassword}
                 />
+                {passwordErrors.confirmPassword && (
+                  <p className="text-sm text-red-500">{passwordErrors.confirmPassword}</p>
+                )}
               </div>
-              <Button type="submit" className="w-full">
-                <Lock className="h-4 w-4 mr-2" />
-                Change Password
+              <Button type="submit" className="w-full" disabled={isChangingPassword}>
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Changing Password...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Change Password
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>

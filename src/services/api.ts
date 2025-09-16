@@ -64,6 +64,15 @@ export const authAPI = {
     const response = await apiClient.put('/admin/v1/admin/profile', profileData);
     return response.data;
   },
+
+  changePassword: async (passwordData: {
+    currentPassword: string;
+    newPassword: string;
+    confirmNewPassword: string;
+  }) => {
+    const response = await apiClient.put('/admin/v1/admin/change-password', passwordData);
+    return response.data;
+  },
 };
 
 export const dashboardAPI = {
